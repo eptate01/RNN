@@ -7,7 +7,7 @@ from torch.nn.utils.rnn import pad_sequence
 import numpy as np
 import time
 
-BATCH_SIZE = 2
+BATCH_SIZE = 1
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print("Pytorch CUDA Version is ", torch.version.cuda)
 def one_hot(sequence, dictionary_size):
@@ -28,7 +28,7 @@ class RNNModel(nn.Module):
     def forward(self, x):
         hidden_state = self.init_hidden()
         output,hidden_state = self.rnn(x, hidden_state)
-        output = output.contiguous().view(-1, self.hidden_size)
+        #output = output.contiguous().view(-1, self.hidden_size)
         output = self.fc(output)
         return output, hidden_state
         
@@ -107,13 +107,13 @@ dictionary_size = len(charInt)
 one_hot(input_sequence[0:BATCH_SIZE-1], dictionary_size)
 
 
-model = RNNModel(dictionary_size, dictionary_size, 300, 2).to(device)
+model = RNNModel(dictionary_size, dictionary_size, 100, 1).to(device)
 
 #Define Loss
 loss = nn.CrossEntropyLoss()
 
 #Use Adam again
-optimizer = torch.optim.Adam(model.parameters(.05))
+optimizer = torch.optim.Adam(model.parameters())
 start = time.time()
 for epoch in range(3):
     for i in range(0,len(input_sequence),BATCH_SIZE):
@@ -121,16 +121,20 @@ for epoch in range(3):
         x = torch.from_numpy(one_hot(input_sequence[i], dictionary_size)).to(device)
         y = torch.Tensor(target_sequence[i:i+BATCH_SIZE]).to(device)
         if (len(target_sequence[i:i+BATCH_SIZE]) == BATCH_SIZE):
-            #print(y)
             hidden = model.init_hidden()
             output, hidden = model(x)
-            
-            lossValue = loss(output, y.view(-1).long())
+            #output = output.view(BATCH_SIZE,max_length,65)
+            print(output.size())
+            print(y.size())
+            y =y.view(BATCH_SIZE, -1).long()
+            print(y.size())
+            #print(y.long())
+            lossValue = loss(output, y).mean(dim=0)
             #Calculates gradient
             lossValue.backward()
             #Updates weights
             optimizer.step()
-            if i%1000 == 0:
+            if i%1 == 0:
                 print("Loss: {:.4f}".format(lossValue.item()))
 
 end = time.time()
