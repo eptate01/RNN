@@ -5,9 +5,11 @@ from torch.utils.data import DataLoader, TensorDataset
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 import numpy as np
+import time
 
-BATCH_SIZE = 100
-
+BATCH_SIZE = 2
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print("Pytorch CUDA Version is ", torch.version.cuda)
 def one_hot(sequence, dictionary_size):
     encoding = np.zeros((BATCH_SIZE,len(sequence), dictionary_size), dtype=np.float32)
     for i in range(len(sequence)):
@@ -31,7 +33,7 @@ class RNNModel(nn.Module):
         return output, hidden_state
         
     def init_hidden(self):
-        hidden = torch.zeros(self.num_layers, BATCH_SIZE, self.hidden_size)
+        hidden = torch.zeros(self.num_layers, BATCH_SIZE, self.hidden_size).to(device)
         return hidden
 
 def predict(model, character):
@@ -40,7 +42,7 @@ def predict(model, character):
     #print(characterInput)
     characterInput = one_hot(characterInput, dictionary_size)
     #print(characterInput)
-    characterInput = torch.from_numpy(characterInput)
+    characterInput = torch.from_numpy(characterInput).to(device)
     #print(character)
     out, hidden = model(characterInput)
     
@@ -105,20 +107,19 @@ dictionary_size = len(charInt)
 one_hot(input_sequence[0:BATCH_SIZE-1], dictionary_size)
 
 
-model = RNNModel(dictionary_size, dictionary_size, 100, 1)
+model = RNNModel(dictionary_size, dictionary_size, 300, 2).to(device)
 
 #Define Loss
 loss = nn.CrossEntropyLoss()
 
 #Use Adam again
-optimizer = torch.optim.Adam(model.parameters())
-
-for epoch in range(10):
+optimizer = torch.optim.Adam(model.parameters(.05))
+start = time.time()
+for epoch in range(3):
     for i in range(0,len(input_sequence),BATCH_SIZE):
         optimizer.zero_grad()
-        x = torch.from_numpy(one_hot(input_sequence[i], dictionary_size))
-        #print(x)
-        y = torch.Tensor(target_sequence[i:i+BATCH_SIZE])
+        x = torch.from_numpy(one_hot(input_sequence[i], dictionary_size)).to(device)
+        y = torch.Tensor(target_sequence[i:i+BATCH_SIZE]).to(device)
         if (len(target_sequence[i:i+BATCH_SIZE]) == BATCH_SIZE):
             #print(y)
             hidden = model.init_hidden()
@@ -129,9 +130,10 @@ for epoch in range(10):
             lossValue.backward()
             #Updates weights
             optimizer.step()
-            
-            print("Loss: {:.4f}".format(lossValue.item()))
+            if i%1000 == 0:
+                print("Loss: {:.4f}".format(lossValue.item()))
 
-
+end = time.time()
+print(end - start)
     
 print(sample(model, 50))
